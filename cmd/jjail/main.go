@@ -43,8 +43,8 @@ func usage() {
 Allowed commands:
   log                     - List the mutable subtree
   status (st)             - Show the working copy status
-  diff [rev]              - Show changes in a revision (defaults to @)
-  show [rev]              - Show commit message and changes in a revision (defaults to @)
+  diff [rev] [files...]   - Show changes in a revision (defaults to @)
+  show [rev] [files...]   - Show commit message and changes in a revision (defaults to @)
   new [base_rev]          - Create a new change on top of base_rev (defaults to @)
   edit <rev>              - Set a revision as the working copy
   describe <rev> <msg>    - Update the description of a change
@@ -130,19 +130,35 @@ func main() {
 
 	case "diff":
 		target := "@"
-		if len(args) > 0 {
-			target = args[0]
+		remainingArgs := args
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+			// Check if args[0] is a valid revision
+			checkCmd := newJJCmd("log", "-r", args[0], "--no-graph", "-T", "")
+			if err := checkCmd.Run(); err == nil {
+				target = args[0]
+				remainingArgs = args[1:]
+			}
 		}
 		validateRevs(target)
-		runJJ("diff", "-r", target)
+		jjArgs := []string{"diff", "-r", target}
+		jjArgs = append(jjArgs, remainingArgs...)
+		runJJ(jjArgs...)
 
 	case "show":
 		target := "@"
-		if len(args) > 0 {
-			target = args[0]
+		remainingArgs := args
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+			// Check if args[0] is a valid revision
+			checkCmd := newJJCmd("log", "-r", args[0], "--no-graph", "-T", "")
+			if err := checkCmd.Run(); err == nil {
+				target = args[0]
+				remainingArgs = args[1:]
+			}
 		}
 		validateRevs(target)
-		runJJ("show", target)
+		jjArgs := []string{"show", target}
+		jjArgs = append(jjArgs, remainingArgs...)
+		runJJ(jjArgs...)
 
 	case "edit":
 		if len(args) < 1 {

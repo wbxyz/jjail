@@ -55,8 +55,8 @@ Instead, you MUST use the `jjail` CLI tool, which is a sandboxed wrapper around 
 ### Allowed Commands:
 - `log` / `list`: View the allowed subtree (`agent::`).
 - `status` / `st`: Show the working copy status.
-- `diff [rev]`: Show changes in a revision (defaults to `@`).
-- `show [rev]`: Show commit message and changes in a revision (defaults to `@`).
+- `diff [rev] [files...]`: Show changes in a revision (defaults to `@`). Supports flags like `--summary`.
+- `show [rev] [files...]`: Show commit message and changes in a revision (defaults to `@`).
 - `new [base_rev]`: Create a new change on top of `base_rev` (defaults to `@`).
 - `edit <rev>`: Set a revision as the working copy.
 - `describe <rev> <msg>`: Update the description of a change.

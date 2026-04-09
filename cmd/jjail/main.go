@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const agentBookmark = "gemini"
+const agentBookmark = "agent"
 
 func findExecutable(name string) string {
 	if path, err := exec.LookPath(name); err == nil {

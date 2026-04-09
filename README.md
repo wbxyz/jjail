@@ -75,7 +75,7 @@ Instead, you MUST use the `jjail` CLI tool, which is a sandboxed wrapper around 
 
 ## Security Guarantee
 
-By restricting operations to the `gemini::` subtree, `jjail` ensures that an agent cannot:
+By restricting operations to the `agent::` subtree, `jjail` ensures that an agent cannot:
 - Accidentally rebase internal commits onto public branches.
 - Modify historical commits that are not part of its current task.
 - Access or manipulate sensitive parts of the repository history outside its assigned scope.

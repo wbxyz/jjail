@@ -42,12 +42,17 @@ func usage() {
 	usageText := `Usage: jj-agent <command> [args...]
 Allowed commands:
   log                     - List the mutable subtree
+  status (st)             - Show the working copy status
+  diff [rev]              - Show changes in a revision (defaults to @)
+  show [rev]              - Show commit message and changes in a revision (defaults to @)
   new [base_rev]          - Create a new change on top of base_rev (defaults to @)
+  edit <rev>              - Set a revision as the working copy
   describe <rev> <msg>    - Update the description of a change
   rebase <src> <dest>     - Rebase <src> onto <dest>
   squash <src> [into_rev] - Squash <src> into <into_rev> (defaults to parent)
   split <rev>             - Split a change into two
-  duplicate <rev>         - Duplicate a change`
+  duplicate <rev>         - Duplicate a change
+  abandon <rev>           - Abandon a change`
 	fmt.Fprintln(os.Stderr, usageText)
 	os.Exit(1)
 }
@@ -118,6 +123,44 @@ func main() {
 	case "log", "list":
 		fmt.Printf("--- Viewing allowed subtree: %s:: ---\n", agentBookmark)
 		runJJ("log", "-r", fmt.Sprintf("%s::", agentBookmark))
+
+	case "status", "st":
+		validateRevs("@")
+		runJJ("status")
+
+	case "diff":
+		target := "@"
+		if len(args) > 0 {
+			target = args[0]
+		}
+		validateRevs(target)
+		runJJ("diff", "-r", target)
+
+	case "show":
+		target := "@"
+		if len(args) > 0 {
+			target = args[0]
+		}
+		validateRevs(target)
+		runJJ("show", target)
+
+	case "edit":
+		if len(args) < 1 {
+			usage()
+		}
+		target := args[0]
+		validateRevs(target)
+		fmt.Printf("Editing change %s...\n", target)
+		runJJ("edit", target)
+
+	case "abandon":
+		if len(args) < 1 {
+			usage()
+		}
+		target := args[0]
+		validateRevs(target)
+		fmt.Printf("Abandoning change %s...\n", target)
+		runJJ("abandon", target)
 
 	case "new":
 		target := "@"

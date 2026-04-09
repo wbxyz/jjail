@@ -1,35 +1,40 @@
 # jjail
 
-`jjail` is a security-focused utility designed to wrap the [Jujutsu (jj)](https://github.com/martinvonz/jj) CLI for use by AI agents. It provides a sandboxed environment that restricts an agent's ability to modify the repository history outside of a designated subtree.
-
-## Goal
-
-The primary goal of `jjail` is to allow AI agents to interact with a Jujutsu repository while guaranteeing that they cannot modify, rebase, or otherwise interfere with commits outside of their authorized "jail."
+`jjail` is a security-focused utility designed to wrap the [Jujutsu (jj)](https://github.com/jj-vcs/jj) CLI for use by AI agents. It provides a sandboxed environment that restricts an agent's ability to modify the repository history outside of a designated subtree.
 
 ## How it Works
 
-`jjail` enforces a sandbox boundary using a specific Jujutsu bookmark (default: `gemini`). Any operation that involves a revision is validated to ensure that the revision falls within the subtree defined by that bookmark.
+To use `jjail`, you place the `agent` bookmark in your jj graph somewhere. `jjail` will then only allow changes within that subtree.
+
+Any operation that involves a revision is validated to ensure that the revision falls within the subtree defined by the `agent` bookmark.
 
 The validation logic uses the Jujutsu revset expression:
-`(<target_rev>) ~ (<bookmark>::)`
+`(<target_rev>) ~ (agent::)`
 
 If this expression returns any commits, it means the target revision is outside the allowed subtree, and the operation is blocked.
 
-## Installation
+## Installation and Setup
 
-You can install `jjail` directly using `go install`:
+1. Install `jjail` using `go install`:
+   ```bash
+   go install github.com/wbxyz/jjail/cmd/jjail@latest
+   ```
+   Ensure that your `$(go env GOPATH)/bin` directory is in your system's `PATH`.
 
-```bash
-go install github.com/wbxyz/jjail/cmd/jjail@latest
-```
+2. Place the `agent` bookmark in your repository where you want the agent to start working:
+   ```bash
+   jj bookmark create agent -r @
+   ```
 
-Ensure that your `$(go env GOPATH)/bin` directory is in your system's `PATH`.
+3. Update your `AGENTS.md` or `GEMINI.md` file with the [AI Agent Instructions](#ai-agent-instructions-agentsmd--geminimd) below.
+
+4. Run your AI agent.
 
 ## Allowed Commands
 
 `jjail` only exposes a subset of `jj` commands that are safe and relevant for agent workflows:
 
-- `log` / `list`: View the allowed subtree (`gemini::`).
+- `log` / `list`: View the allowed subtree (`agent::`).
 - `status` / `st`: Show the working copy status.
 - `diff [rev]`: Show changes in a revision (defaults to `@`).
 - `show [rev]`: Show commit message and changes in a revision (defaults to `@`).
@@ -62,7 +67,7 @@ Instead, you MUST use the `jjail` CLI tool, which is a sandboxed wrapper around 
 ### Rules for using jjail:
 1. **Never use `jj` or `git` directly for modifications.** Always use `jjail` to create commits, update descriptions, squash, rebase, or abandon changes.
 2. **Read-only `jj` is allowed.** You may use `jj log`, `jj show`, or `jj diff` for read-only exploration of the broader repository if needed, but `jjail log` and `jjail diff` are preferred.
-3. **Your sandbox is the `gemini` bookmark.** All your work will be rooted from the commits in the `gemini::` subtree. `jjail` enforces this boundary. If `jjail` throws a "Sandbox violation!" error, it means you are trying to operate on a commit outside your allowed scope.
+3. **Your sandbox is the `agent` bookmark.** All your work will be rooted from the commits in the `agent::` subtree. `jjail` enforces this boundary. If `jjail` throws a "Sandbox violation!" error, it means you are trying to operate on a commit outside your allowed scope.
 4. **Interactive Commands.** Do not use `jjail split` as it requires an interactive terminal and will cause a crash. Use `jjail new`, copy partial file contents, and `jjail squash` to manually split changes if absolutely necessary.
 
 ### Common Workflow:

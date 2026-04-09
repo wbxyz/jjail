@@ -39,7 +39,7 @@ func findExecutable(name string) string {
 }
 
 func usage() {
-	usageText := `Usage: jj-agent <command> [args...]
+	usageText := `Usage: jjail <command> [args...]
 Allowed commands:
   log                     - List the mutable subtree
   status (st)             - Show the working copy status

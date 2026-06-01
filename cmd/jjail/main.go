@@ -4,39 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
+
+	"github.com/wbxyz/jjail/internal/jjutil"
 )
-
-const agentBookmark = "agent"
-
-func findExecutable(name string) string {
-	if path, err := exec.LookPath(name); err == nil {
-		return path
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return name
-	}
-
-	pathEnv := os.Getenv("PATH")
-	for _, dir := range strings.Split(pathEnv, string(os.PathListSeparator)) {
-		if strings.HasPrefix(dir, "~/") {
-			dir = filepath.Join(home, dir[2:])
-		} else if dir == "~" {
-			dir = home
-		}
-
-		fullPath := filepath.Join(dir, name)
-		if stat, err := os.Stat(fullPath); err == nil && !stat.IsDir() && stat.Mode()&0111 != 0 {
-			return fullPath
-		}
-	}
-
-	return name
-}
 
 func usage() {
 	usageText := `Usage: jjail <command> [args...]
@@ -57,27 +28,6 @@ Allowed commands:
 	os.Exit(1)
 }
 
-// newJJCmd creates an exec.Cmd for jj, explicitly setting the working directory.
-func newJJCmd(args ...string) *exec.Cmd {
-	fullArgs := append([]string{"--no-pager", "--color=never"}, args...)
-	cmd := exec.Command(findExecutable("jj"), fullArgs...)
-	cmd.Env = os.Environ()
-	if cwd, err := os.Getwd(); err == nil {
-		cmd.Dir = cwd
-	}
-	return cmd
-}
-
-// runJJ executes a jj command and pipes output directly to the agent's stdout/stderr
-func runJJ(args ...string) {
-	cmd := newJJCmd(args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		os.Exit(1) // jj already printed the error to stderr
-	}
-}
-
 // validateRevs enforces the sandbox boundaries for the given revisions.
 func validateRevs(revs ...string) {
 	for _, rev := range revs {
@@ -86,7 +36,7 @@ func validateRevs(revs ...string) {
 		}
 
 		// 1. Ensure the revision exists and is valid
-		checkCmd := newJJCmd("log", "-r", rev, "--no-graph", "-T", "")
+		checkCmd := jjutil.NewJJCmd("log", "-r", rev, "--no-graph", "-T", "")
 		if err := checkCmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Revision '%s' is invalid or does not exist.\n", rev)
 			os.Exit(1)
@@ -94,8 +44,8 @@ func validateRevs(revs ...string) {
 
 		// 2. Sandbox Check: (Target) ~ (Bookmark::)
 		// If the result contains any commits, the target is out of bounds.
-		query := fmt.Sprintf("(%s) ~ (%s::)", rev, agentBookmark)
-		sandboxCmd := newJJCmd("log", "-r", query, "--no-graph", "-T", "commit_id")
+		query := fmt.Sprintf("(%s) ~ (%s::)", rev, jjutil.AgentBookmark)
+		sandboxCmd := jjutil.NewJJCmd("log", "-r", query, "--no-graph", "-T", "commit_id")
 
 		out, err := sandboxCmd.CombinedOutput()
 		if err != nil {
@@ -105,7 +55,7 @@ func validateRevs(revs ...string) {
 		}
 
 		if len(bytes.TrimSpace(out)) > 0 {
-			fmt.Fprintf(os.Stderr, "Error: Sandbox violation! Revision '%s' falls outside the '%s' subtree.\n", rev, agentBookmark)
+			fmt.Fprintf(os.Stderr, "Error: Sandbox violation! Revision '%s' falls outside the '%s' subtree.\n", rev, jjutil.AgentBookmark)
 			os.Exit(1)
 		}
 	}
@@ -121,20 +71,20 @@ func main() {
 
 	switch command {
 	case "log", "list":
-		fmt.Printf("--- Viewing allowed subtree: %s:: ---\n", agentBookmark)
-		runJJ("log", "-r", fmt.Sprintf("%s::", agentBookmark))
+		fmt.Printf("--- Viewing allowed subtree: %s:: ---\n", jjutil.AgentBookmark)
+		jjutil.RunJJ("log", "-r", fmt.Sprintf("%s::", jjutil.AgentBookmark))
 
 	case "status", "st":
 		validateRevs("@")
-		runJJ("status")
+		jjutil.RunJJ("status")
 
 	case "diff":
 		target := "@"
 		remainingArgs := args
 		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 			// Check if args[0] is a valid revision
-			checkCmd := newJJCmd("log", "-r", args[0], "--no-graph", "-T", "")
-			if err := checkCmd.Run(); err == nil {
+			checkCmd := jjutil.NewJJCmd("log", "-r", args[0], "--no-graph", "-T", "")
+			if err := checkCmd.Run(); err != nil {
 				target = args[0]
 				remainingArgs = args[1:]
 			}
@@ -142,15 +92,15 @@ func main() {
 		validateRevs(target)
 		jjArgs := []string{"diff", "-r", target}
 		jjArgs = append(jjArgs, remainingArgs...)
-		runJJ(jjArgs...)
+		jjutil.RunJJ(jjArgs...)
 
 	case "show":
 		target := "@"
 		remainingArgs := args
 		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 			// Check if args[0] is a valid revision
-			checkCmd := newJJCmd("log", "-r", args[0], "--no-graph", "-T", "")
-			if err := checkCmd.Run(); err == nil {
+			checkCmd := jjutil.NewJJCmd("log", "-r", args[0], "--no-graph", "-T", "")
+			if err := checkCmd.Run(); err != nil {
 				target = args[0]
 				remainingArgs = args[1:]
 			}
@@ -158,7 +108,7 @@ func main() {
 		validateRevs(target)
 		jjArgs := []string{"show", target}
 		jjArgs = append(jjArgs, remainingArgs...)
-		runJJ(jjArgs...)
+		jjutil.RunJJ(jjArgs...)
 
 	case "edit":
 		if len(args) < 1 {
@@ -167,7 +117,7 @@ func main() {
 		target := args[0]
 		validateRevs(target)
 		fmt.Printf("Editing change %s...\n", target)
-		runJJ("edit", target)
+		jjutil.RunJJ("edit", target)
 
 	case "abandon":
 		if len(args) < 1 {
@@ -176,7 +126,7 @@ func main() {
 		target := args[0]
 		validateRevs(target)
 		fmt.Printf("Abandoning change %s...\n", target)
-		runJJ("abandon", target)
+		jjutil.RunJJ("abandon", target)
 
 	case "new":
 		target := "@"
@@ -185,7 +135,7 @@ func main() {
 		}
 		validateRevs(target)
 		fmt.Printf("Creating new change on top of %s...\n", target)
-		runJJ("new", target)
+		jjutil.RunJJ("new", target)
 
 	case "describe":
 		if len(args) < 2 {
@@ -196,7 +146,7 @@ func main() {
 		msg := args[1]
 		validateRevs(target)
 		fmt.Printf("Updating description for %s...\n", target)
-		runJJ("describe", target, "-m", msg)
+		jjutil.RunJJ("describe", target, "-m", msg)
 
 	case "rebase":
 		if len(args) < 2 {
@@ -207,7 +157,7 @@ func main() {
 		dest := args[1]
 		validateRevs(src, dest)
 		fmt.Printf("Rebasing %s onto %s...\n", src, dest)
-		runJJ("rebase", "-s", src, "-d", dest)
+		jjutil.RunJJ("rebase", "-s", src, "-d", dest)
 
 	case "squash":
 		src := "@"
@@ -218,11 +168,11 @@ func main() {
 			dest := args[1]
 			validateRevs(src, dest)
 			fmt.Printf("Squashing %s into %s...\n", src, dest)
-			runJJ("squash", "-r", src, "--into", dest)
+			jjutil.RunJJ("squash", "-r", src, "--into", dest)
 		} else {
 			validateRevs(src)
 			fmt.Printf("Squashing %s into its immediate parent...\n", src)
-			runJJ("squash", "-r", src)
+			jjutil.RunJJ("squash", "-r", src)
 		}
 
 	case "split":
@@ -232,7 +182,7 @@ func main() {
 		target := args[0]
 		validateRevs(target)
 		fmt.Printf("Splitting change %s...\n", target)
-		runJJ("split", "-r", target)
+		jjutil.RunJJ("split", "-r", target)
 
 	case "duplicate":
 		if len(args) < 1 {
@@ -241,7 +191,7 @@ func main() {
 		target := args[0]
 		validateRevs(target)
 		fmt.Printf("Duplicating change %s...\n", target)
-		runJJ("duplicate", "-r", target)
+		jjutil.RunJJ("duplicate", "-r", target)
 
 	default:
 		fmt.Fprintf(os.Stderr, "Error: Unknown or unauthorized command '%s'.\n", command)

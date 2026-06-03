@@ -71,43 +71,19 @@ func main() {
 
 	switch command {
 	case "log", "list":
-		fmt.Printf("--- Viewing allowed subtree: %s:: ---\n", jjutil.AgentBookmark)
-		jjutil.RunJJ("log", "-r", fmt.Sprintf("%s::", jjutil.AgentBookmark))
+		jjArgs := append([]string{"log"}, args...)
+		jjutil.RunJJ(jjArgs...)
 
 	case "status", "st":
-		validateRevs("@")
-		jjutil.RunJJ("status")
+		jjArgs := append([]string{"status"}, args...)
+		jjutil.RunJJ(jjArgs...)
 
 	case "diff":
-		target := "@"
-		remainingArgs := args
-		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-			// Check if args[0] is a valid revision
-			checkCmd := jjutil.NewJJCmd("log", "-r", args[0], "--no-graph", "-T", "")
-			if err := checkCmd.Run(); err != nil {
-				target = args[0]
-				remainingArgs = args[1:]
-			}
-		}
-		validateRevs(target)
-		jjArgs := []string{"diff", "-r", target}
-		jjArgs = append(jjArgs, remainingArgs...)
+		jjArgs := append([]string{"diff"}, args...)
 		jjutil.RunJJ(jjArgs...)
 
 	case "show":
-		target := "@"
-		remainingArgs := args
-		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-			// Check if args[0] is a valid revision
-			checkCmd := jjutil.NewJJCmd("log", "-r", args[0], "--no-graph", "-T", "")
-			if err := checkCmd.Run(); err != nil {
-				target = args[0]
-				remainingArgs = args[1:]
-			}
-		}
-		validateRevs(target)
-		jjArgs := []string{"show", target}
-		jjArgs = append(jjArgs, remainingArgs...)
+		jjArgs := append([]string{"show"}, args...)
 		jjutil.RunJJ(jjArgs...)
 
 	case "edit":
